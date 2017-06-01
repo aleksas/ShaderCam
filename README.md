@@ -1,7 +1,5 @@
 ##Shader Camera
-By [LittleCheeseCake](http://littlecheesecake.me)
-
-Occasionally I receives emails asking how to render Camera Frame using OpenGL ES on Android. I lazily used some codes from an open source project [InstaCam](https://github.com/harism/android_instacam) without fully understand until recently I reviewed some fundamentals of OpenGL ES and re-impelemented a demo app for camera frame rendering using shaders. This post is to discuss some key aspects in the implementation and share the demo codes.
+Forked from [LittleCheeseCake](https://github.com/yulu/ShaderCam)
 
 ###CameraRenderer
 Drawing using OpenGL is implemented by rendering on GLSurfaceView. The common approach is subclass the GLSurfaceView and implements the GLSurfaceView.Renderer. The rendering tasks are performed by implementing the interface.
@@ -101,10 +99,26 @@ In the fragment shader when the texture is binded, the first line has to be inse
 precision mediump float;
 
 uniform samplerExternalOES sTexture;
+
 varying vec2 vTextureCoord;
+varying vec4 vColor;
 
 void main(){
-	gl_FragColor = texture2D(sTexture, vTextureCoord);
+    gl_FragColor = vec4(mix(vColor.rgb, texture2D(sTexture, vTextureCoord).rgb, vColor.a), 1.0);
+}
+```
+
+###Draw a triangle
+
+```java
+private void renderTriangle(int aPosition, int aColor){
+	GLES20.glEnableVertexAttribArray(aPosition);
+	GLES20.glEnableVertexAttribArray(aColor);
+	GLES20.glVertexAttribPointer(aPosition, VALUES_PER_TRIANGLE_VERTEX, GLES20.GL_FLOAT, false, 0, mTriangleVertexBuffer);
+	GLES20.glVertexAttribPointer(aColor, VALUES_PER_COLOR, GLES20.GL_FLOAT, false, 0, mTriangleColorBuffer);
+	GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, triangleVertexCount);
+	GLES20.glDisableVertexAttribArray(aColor);
+	GLES20.glDisableVertexAttribArray(aPosition);
 }
 ```
 
@@ -122,10 +136,12 @@ private void init(){
 }
 
 ...
-private void renderQuad(int aPosition){
-	GLES20.glVertexAttribPointer(aPosition, 2, GLES20.GL_BYTE, false, 0, mFullQuadVertices);
+private void renderCameraTexture(int aPosition){
+	GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, mCameraTexture.getTextureId());
 	GLES20.glEnableVertexAttribArray(aPosition);
-	GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
+	GLES20.glVertexAttribPointer(aPosition, VALUES_PER_QUAD_VERTEX, GLES20.GL_BYTE, false, 0, mBackgroundQuadVertexBuffer);
+	GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, quadVertexCount);
+	GLES20.glDisableVertexAttribArray(aPosition);
 }
 ```
 
@@ -157,23 +173,27 @@ public synchronized void onDrawFrame(GL10 gl) {
 In the vertex shader, uTransformM, uOrientationM and ratios together do some work to make sure the frame texture coordinate fit into the phone window:
 
 ```c
+attribute vec4 aPosition;
+attribute vec4 aColor;
+
 uniform mat4 uTransformM;
 uniform mat4 uOrientationM;
 uniform vec2 ratios;
-attribute vec2 aPosition;
 
 varying vec2 vTextureCoord;
+varying vec4 vColor;
 
 void main(){
-	gl_Position = vec4(aPosition, 0.0, 1.0);
+    vColor = aColor;
+	gl_Position = aPosition;
 	vTextureCoord = (uTransformM * ((uOrientationM * gl_Position + 1.0)*0.5)).xy;
 	gl_Position.xy *= ratios;
 }
 ```
 
 ###Closure
-Some details are not covered in the post. It might be confusing by looking at the code fragments above. Here what I want to do is to take note of the critical steps in my implementation for my own record. I think it will be much helpful to go through the complete implementation of the [demo app](https://github.com/yulu/ShaderCam) (which is quite concise, only a few hundered lines of codes). What will be more interesting? Try to replace the fragment shader with some funny shaders in [Instagram_Filter](https://github.com/yulu/Instagram_Filter) and [ShaderFilter](https://github.com/yulu/ShaderFilter), to see the interesting filter applied real-time on camera view.
+Some details are not covered in the post. It might be confusing by looking at the code fragments above. It will be much helpful to go through the complete implementation of the [demo app](https://github.com/yulu/ShaderCam) (which is quite concise, only a few hundered lines of codes). What will be more interesting? Try to replace the fragment shader with some funny shaders in [Instagram_Filter](https://github.com/yulu/Instagram_Filter) and [ShaderFilter](https://github.com/yulu/ShaderFilter), to see the interesting filter applied real-time on camera view.
 
-![manga](https://dl.dropboxusercontent.com/spa/pv9m61pztxstay5/manga.png)
+![Camera screenshot with semi-transparent triangle overlay](Screenshot.png)
 
 
