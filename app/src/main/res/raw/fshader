@@ -1,0 +1,12 @@
+#extension GL_OES_EGL_image_external : require
+
+precision mediump float;
+
+uniform samplerExternalOES sTexture;
+
+varying vec2 vTextureCoord;
+varying vec4 vColor;
+
+void main(){
+    gl_FragColor = vec4(mix(vColor.rgb, texture2D(sTexture, vTextureCoord).rgb, vColor.a), 1.0);
+}
